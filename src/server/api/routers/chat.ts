@@ -14,6 +14,7 @@ import { StringOutputParser } from "@langchain/core/output_parsers";
 import { RunnableWithMessageHistory } from "@langchain/core/runnables";
 
 const finalizedScriptRegex = /^[^a-zA-Z0-9]*FINALIZED SCRIPT/;
+const titleRegex = /^[^a-zA-Z0-9]*FINALIZED SCRIPT \((.*?)\)/;
 
 const model = new ChatOpenAI({
     model: "gpt-4.1-mini",
@@ -55,10 +56,14 @@ export const chatRouter = createTRPCRouter({
                     }
                 );
                 if(finalizedScriptRegex.test(res)) {
+                    const arr = res.match(titleRegex);
+                    let title = "";
+                    if (arr && arr[1]) title = arr[1];
                     await ctx.db.videoScript.create({
                         data: {
                             userId: ctx.session.user.id,
                             content: res,
+                            title,
                         },
                     });
                     return {

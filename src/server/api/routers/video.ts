@@ -1,8 +1,9 @@
 import { env } from "~/env";
-import { adminProcedure, createTRPCRouter } from "../trpc";
+import { adminProcedure, createTRPCRouter, doctorProcedure } from "../trpc";
 import { getUploadAuthParams } from "@imagekit/next/server";
 import z from "zod";
 import { Status } from "@prisma/client";
+import type { Script } from "~/lib/types";
 
 export const videoRouter = createTRPCRouter({
     authUploadVideo: adminProcedure.query(async ({}) => {
@@ -136,4 +137,49 @@ export const videoRouter = createTRPCRouter({
                 rejectedCount: statusCounts[Status.REJECTED] ?? 0,
             };
         }),
+    fetchVideoForDoctor: doctorProcedure.query(async ({ ctx }) => {
+        const temp = await ctx.db.videoScript.findMany({
+            where: {
+                userId: ctx.session.user.id,
+            },
+            orderBy: { createdAt: "desc" },
+            select: {
+                id: true,
+                title: true,
+                createdAt: true,
+                reason: true,
+                status: true,
+                videoUrl: true,
+            },
+        });
+        return temp.map((item) => {
+            return {
+                id: item.id,
+                title: item.title,
+                createdAt: item.createdAt,
+                reason: item.reason,
+                status: item.status,
+                videoUrl: item.videoUrl,
+                thumbnailUrl: item.videoUrl?.concat("/ik-thumbnail.jpg"),
+            } as Script;
+        });
+    }),
+    giveUserFeedback: doctorProcedure.input(z.object({
+        scriptId: z.string().min(1, "Script ID is required"),
+        feedback: z.string().min(1, "Feedback is required"),
+    })).mutation(async ({ ctx, input }) => {
+        const script = await ctx.db.videoScript.findUnique({
+            where: { id: input.scriptId },
+        });
+        if (!script || script.userId !== ctx.session.user.id) {
+            throw new Error("Script not found");
+        }
+        await ctx.db.videoScript.update({
+            where: { id: input.scriptId },
+            data: {
+                userFeedback: input.feedback,
+                status: Status.PENDING,
+            },
+        });
+    }),
 });
