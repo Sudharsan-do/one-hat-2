@@ -56,14 +56,12 @@ export const chatRouter = createTRPCRouter({
                     }
                 );
                 if(finalizedScriptRegex.test(res)) {
-                    const arr = res.match(titleRegex);
-                    let title = "";
-                    if (arr && arr[1]) title = arr[1];
+                    const arr = titleRegex.exec(res);
                     await ctx.db.videoScript.create({
                         data: {
                             userId: ctx.session.user.id,
                             content: res,
-                            title,
+                            title: arr?.[1] ?? "Untitled Script",
                         },
                     });
                     return {
