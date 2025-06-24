@@ -7,7 +7,6 @@ import {
     ChatPromptTemplate,
     MessagesPlaceholder,
 } from "@langchain/core/prompts";
-import { fileURLToPath } from "url";
 import path from "path";
 import fs from "fs";
 import { StringOutputParser } from "@langchain/core/output_parsers";
@@ -173,10 +172,7 @@ function genPayload(
 }
 
 function loadSystemPrompt() {
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = path.dirname(__filename);
-
-    const file_path = path.join(__dirname, "../../../../system-prompt.txt");
+    const file_path = path.join(process.cwd(), "system-prompt.txt");
 
     try {
         const content = fs.readFileSync(file_path, "utf-8");
