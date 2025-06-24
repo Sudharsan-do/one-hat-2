@@ -17,6 +17,9 @@ export const env = createEnv({
       .default("development"),
     OPENAI_API_KEY: z.string(),
     IMAGEKIT_PRIVATE_KEY: z.string(),
+    HEYGEN_API_KEY: z.string(),
+    HEYGEN_URL: z.string(),
+    HEYGEN_AVATAR_WEBHOOK_ID: z.string()
   },
 
   /**
@@ -39,6 +42,9 @@ export const env = createEnv({
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     IMAGEKIT_PRIVATE_KEY: process.env.IMAGEKIT_PRIVATE_KEY,
     NEXT_PUBLIC_IMAGEKIT_KEY: process.env.NEXT_PUBLIC_IMAGEKIT_KEY,
+    HEYGEN_API_KEY: process.env.HEYGEN_API_KEY,
+    HEYGEN_URL: process.env.HEYGEN_URL,
+    HEYGEN_AVATAR_WEBHOOK_ID: process.env.HEYGEN_AVATAR_WEBHOOK_ID
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially

@@ -8,7 +8,7 @@ generator client {
 datasource db {
     provider = "postgresql"
     url      = env("DATABASE_URL")
-    //directUrl = env("DIRECT_URL")
+    directUrl = env("DIRECT_URL")
 }
 
 enum UserRole {
@@ -34,7 +34,18 @@ model VideoScript {
     videoUrl    String?
     userFeedback String?  @db.Text
     status      Status   @default(PENDING)
+    heyGenVideoId String? @unique
     user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+
+model Webhook{
+    id  String @id @default(cuid())
+    description String
+    secret String
+    space_id String
+    endpoint_id String
+    status Boolean @default(true)
 }
 
 // Necessary for Next auth
@@ -71,6 +82,8 @@ model User {
     email         String   @unique
     emailVerified DateTime?
     hashedPassword String?
+    avatar_id   String?
+    voice_id    String?
     role          UserRole  @default(DOCTOR)
     accounts      Account[]
     sessions      Session[]

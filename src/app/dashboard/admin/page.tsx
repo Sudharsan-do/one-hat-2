@@ -15,7 +15,7 @@ import {
     flexRender,
     createColumnHelper,
 } from "@tanstack/react-table";
-import { Download, Eye, LogOut, X, Check, AlertCircle } from "lucide-react";
+import { Download, Eye, LogOut, X, Check, AlertCircle, Video } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { UploadSection } from "~/app/_components/admin/upload-button";
 import { RejectSection } from "~/app/_components/admin/reject-button";
@@ -23,24 +23,15 @@ import { api } from "~/trpc/react";
 import toast from "react-hot-toast";
 
 // Types
-interface BackendScriptItem {
+interface Script {
     id: string;
     userId: string;
     status: "PENDING" | "REJECTED" | "APPROVED";
     createdAt: Date;
     reason?: string | null;
     content: string;
+    videoUrl?: string;
     user?: { email?: string };
-}
-
-interface Script {
-    id: string;
-    userId: string;
-    email: string;
-    status: "PENDING" | "COMPLETED" | "REJECTED";
-    createdAt: string;
-    content: string;
-    reason?: string;
 }
 
 interface FilterState {
@@ -59,13 +50,13 @@ interface CountState {
 const STATUS_OPTIONS = [
     { value: "", label: "All Statuses" },
     { value: "PENDING", label: "Pending" },
-    { value: "COMPLETED", label: "Completed" },
+    { value: "APPROVED", label: "Approved" },
     { value: "REJECTED", label: "Rejected" },
 ] as const;
 
 const STATUS_COLORS = {
     PENDING: "bg-yellow-100 text-yellow-800 border-yellow-200",
-    COMPLETED: "bg-green-100 text-green-800 border-green-200",
+    APPROVED: "bg-green-100 text-green-800 border-green-200",
     REJECTED: "bg-red-100 text-red-800 border-red-200",
 } as const;
 
@@ -140,6 +131,38 @@ const ScriptReviewDashboard = () => {
         }
     }, [selectedScript]);
 
+    // Handle download video
+    const handleDownloadVideo = useCallback(async () => {
+        if (!selectedScript?.videoUrl) return;
+
+        try {
+            const response = await fetch(selectedScript.videoUrl);
+            if (!response.ok) {
+                throw new Error('Failed to fetch video');
+            }
+
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            
+            // Extract file extension from URL or default to mp4
+            const urlParts = selectedScript.videoUrl.split('.');
+            const extension = urlParts.length > 1 ? urlParts[urlParts.length - 1]?.split('?')[0] : 'mp4';
+            
+            a.download = `video-${selectedScript.id}.${extension}`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            toast.success("Video download started");
+        } catch (error) {
+            toast.error("Failed to download video");
+            console.error("Video download error:", error);
+        }
+    }, [selectedScript]);
+
     const handleFilterChange = useCallback(
         (key: keyof FilterState, value: string) => {
             if (timeoutRef.current) {
@@ -172,24 +195,10 @@ const ScriptReviewDashboard = () => {
         void refetch();
     }, [handleCloseModal, refetch]);
 
-    // Transform backend data to frontend format
-    const transformScriptData = useCallback(
-        (item: BackendScriptItem): Script => ({
-            id: item.id,
-            userId: item.userId,
-            email: item.user?.email ?? "",
-            status: item.status === "APPROVED" ? "COMPLETED" : item.status,
-            createdAt: item.createdAt.toString(),
-            content: item.content,
-            reason: item.reason ?? undefined,
-        }),
-        [],
-    );
-
     // Update data when query result changes
     useEffect(() => {
         if (queryResult) {
-            setData(queryResult.list.map(transformScriptData));
+            setData(queryResult.list as Script[]);
             setCount({
                 pending: queryResult.pendingCount,
                 completed: queryResult.completedCount,
@@ -200,7 +209,7 @@ const ScriptReviewDashboard = () => {
             setData([]);
             console.error("Failed to load scripts data:", error);
         }
-    }, [queryResult, error, transformScriptData]);
+    }, [queryResult, error]);
 
     // Column definitions
     const columns = useMemo(() => {
@@ -221,7 +230,7 @@ const ScriptReviewDashboard = () => {
                     <span className="text-gray-700">{info.getValue()}</span>
                 ),
             }),
-            columnHelper.accessor("email", {
+            columnHelper.accessor("user.email", {
                 header: "Email",
                 cell: (info) => (
                     <span className="text-gray-700">{info.getValue()}</span>
@@ -660,7 +669,7 @@ const ScriptReviewDashboard = () => {
                                             <span className="font-medium">
                                                 Email:
                                             </span>{" "}
-                                            {selectedScript.email}
+                                            {selectedScript.user?.email}
                                         </p>
                                         <p>
                                             <span className="font-medium">
@@ -682,13 +691,24 @@ const ScriptReviewDashboard = () => {
                                     <h4 className="mb-2 font-medium text-gray-900">
                                         Actions
                                     </h4>
-                                    <button
-                                        onClick={handleDownloadScript}
-                                        className="flex items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
-                                    >
-                                        <Download size={16} />
-                                        Download Script
-                                    </button>
+                                    <div className="space-y-2">
+                                        {selectedScript.videoUrl && (
+                                            <button
+                                                onClick={handleDownloadVideo}
+                                                className="flex w-full items-center gap-2 rounded-md bg-purple-600 px-4 py-2 text-white transition-colors hover:bg-purple-700"
+                                            >
+                                                <Video size={16} />
+                                                Download Video
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={handleDownloadScript}
+                                            className="flex w-full items-center gap-2 rounded-md bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
+                                        >
+                                            <Download size={16} />
+                                            Download Script
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 

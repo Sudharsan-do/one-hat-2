@@ -2,9 +2,12 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
+    extractScriptData,
     InputArea,
     MessagesArea,
+    ScriptSidebar,
     type Message,
+    type ScriptData,
     type Suggestion,
 } from "~/app/_components/dashboard/message-area";
 import Sidebar from "~/app/_components/dashboard/side-bar";
@@ -12,12 +15,11 @@ import { Header } from "~/app/_components/dashboard/header";
 import { VideosContent } from "~/app/_components/dashboard/videos-content";
 import { api } from "~/trpc/react";
 import toast from "react-hot-toast";
+import { v4 as uuidv4 } from 'uuid';
 
 interface SendMessageResponse {
     message: string;
-    finalized: boolean;
 }
-
 
 const TRENDING_SUGGESTIONS: Suggestion[] = [
     { id: "1", text: "Winter flu symptoms", icon: "🤒" },
@@ -40,24 +42,22 @@ export default function DoctorChatPage() {
     const [activeTab, setActiveTab] = useState<string>("ai-chat");
     const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
     const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-    const [isFinalized, setIsFinalized] = useState<boolean>(false);
     const [isGeneratingVideo, setIsGeneratingVideo] = useState<boolean>(false);
+    const [scriptData, setScriptData] = useState<ScriptData | undefined>(undefined);
+    const [isScriptSidebarOpen, setIsScriptSidebarOpen] = useState<boolean>(false);
+    
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    
     const { data: fetchedMessages } = api.messages.fetchMessages.useQuery();
+    
     const sendMessageMutation = api.messages.send.useMutation({
         onSuccess: (data: SendMessageResponse) => {
             const aiResponse: Message = {
-                id: `${Date.now() + 1}`,
+                id: uuidv4(),
                 content: data.message,
                 role: "assistant",
             };
             setMessages((prev) => [...prev, aiResponse]);
-            if (data.finalized) {
-                setIsFinalized(true);
-                toast.success(
-                    "Your video will be ready soon. Check My videos tab for updates."
-                );
-            }
             setIsTyping(false);
         },
         onError: (error) => {
@@ -66,10 +66,10 @@ export default function DoctorChatPage() {
             setIsTyping(false);
         },
     });
-    const deleteMessagesMutation = api.messages.deleteMessages.useMutation({
+    
+    const finalizeMutation = api.messages.finalize.useMutation({
         onSuccess: () => {
             setMessages([]);
-            setIsFinalized(false);
             setInput("");
             toast.success("Video generation started! Starting new chat...");
             setIsGeneratingVideo(false);
@@ -80,41 +80,57 @@ export default function DoctorChatPage() {
             setIsGeneratingVideo(false);
         },
     });
+
     const scrollToBottom = useCallback((): void => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, []);
-    const handleSubmit = useCallback(async (e: React.FormEvent<Element>): Promise<void> => {
-        e.preventDefault();
-        const trimmedInput = input.trim();
-        if (!trimmedInput || isFinalized) return;
-        const userMessage: Message = {
-            id: `${Date.now()}`,
-            content: trimmedInput,
-            role: "user",
-        };
-        setMessages((prev) => [...prev, userMessage]);
-        setInput("");
-        setIsTyping(true);
-        sendMessageMutation.mutate(trimmedInput);
-    }, [input, isFinalized, sendMessageMutation]);
-    const handleGenerateVideo = useCallback(async (): Promise<void> => {
-        setIsGeneratingVideo(true);
-        setMessages([]);
-        deleteMessagesMutation.mutate();
-    }, [deleteMessagesMutation]);
-    const handleSuggestionClick = useCallback((suggestionText: string): void => {
-        if (!isFinalized) {
-            setInput(suggestionText);
-        }
-    }, [isFinalized]);
+
+    const handleSubmit = useCallback(
+        async (e: React.FormEvent): Promise<void> => {
+            e.preventDefault();
+            const trimmedInput = input.trim();
+            if (!trimmedInput || isGeneratingVideo) return;
+            
+            const userMessage: Message = {
+                id: uuidv4(),
+                content: trimmedInput,
+                role: "user",
+            };
+            setMessages((prev) => [...prev, userMessage]);
+            setInput("");
+            setIsTyping(true);
+            sendMessageMutation.mutate(trimmedInput);
+        },
+        [input, isGeneratingVideo, sendMessageMutation],
+    );
+
+    const handleSuggestionClick = useCallback(
+        (suggestionText: string): void => {
+            if (!isGeneratingVideo) {
+                setInput(suggestionText);
+            }
+        },
+        [isGeneratingVideo],
+    );
+
+    const finalizeScript = useCallback(
+        (script: string, title: string): void => {
+            setIsGeneratingVideo(true);
+            finalizeMutation.mutate({ script, title });
+        },
+        [finalizeMutation],
+    );
+
     useEffect(() => {
         scrollToBottom();
     }, [messages, scrollToBottom]);
+
     useEffect(() => {
         if (fetchedMessages) {
             setMessages(fetchedMessages);
         }
     }, [fetchedMessages]);
+
     useEffect(() => {
         let isMounted = true;
         const loadSuggestions = async () => {
@@ -135,6 +151,21 @@ export default function DoctorChatPage() {
             isMounted = false;
         };
     }, []);
+
+    useEffect(() => {
+        const latestMessage = messages[messages.length - 1];
+        if (latestMessage?.role === "assistant") {
+            const extractedData = extractScriptData(
+                latestMessage.content,
+                latestMessage.id,
+            );
+            if (extractedData) {
+                setScriptData(extractedData);
+                setIsScriptSidebarOpen(true);
+            }
+        }
+    }, [messages]);
+
     return (
         <div className="flex h-screen bg-gray-50">
             <Sidebar
@@ -144,19 +175,15 @@ export default function DoctorChatPage() {
                 setActiveTab={setActiveTab}
             />
             <div className="flex flex-1 flex-col">
-                <Header 
-                    setSidebarOpen={setSidebarOpen} 
-                    activeTab={activeTab} 
-                />
+                <Header setSidebarOpen={setSidebarOpen} activeTab={activeTab} />
                 {activeTab === "ai-chat" ? (
                     <>
                         <MessagesArea
                             messages={messages}
                             isTyping={isTyping}
                             messagesEndRef={messagesEndRef}
-                            isFinalized={isFinalized}
-                            isGeneratingVideo={isGeneratingVideo}
-                            onGenerateVideo={handleGenerateVideo}
+                            setIsScriptSidebarOpen={setIsScriptSidebarOpen}
+                            hasSidebar={isScriptSidebarOpen}
                         />
                         <InputArea
                             input={input}
@@ -165,13 +192,23 @@ export default function DoctorChatPage() {
                             isTyping={isTyping}
                             suggestions={suggestions}
                             onSuggestionClick={handleSuggestionClick}
-                            isFinalized={isFinalized}
+                            isFinalized={isGeneratingVideo}
+                            hasSidebar={isScriptSidebarOpen}
                         />
                     </>
                 ) : (
                     <VideosContent />
                 )}
             </div>
+            <ScriptSidebar
+                scriptData={scriptData ?? null}
+                isVisible={isScriptSidebarOpen}
+                onGenerateVideo={finalizeScript}
+                isGeneratingVideo={isGeneratingVideo}
+                onHide={() => {
+                    setIsScriptSidebarOpen(false);
+                }}
+            />
         </div>
     );
 }

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import { Play, Download, RotateCcw, X, Send } from "lucide-react";
 import type { Script } from "~/lib/types";
 import { api } from "~/trpc/react";
@@ -221,6 +221,156 @@ const StatusAlert = ({
     return null;
 };
 
+// New component to generate and display video thumbnail
+const VideoThumbnail = ({ 
+    videoUrl, 
+    title, 
+    onThumbnailGenerated 
+}: { 
+    videoUrl: string; 
+    title: string; 
+    onThumbnailGenerated?: (thumbnail: string) => void;
+}) => {
+    const [thumbnailUrl, setThumbnailUrl] = useState<string>("");
+    const [isLoading, setIsLoading] = useState(true);
+    const [hasError, setHasError] = useState(false);
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+
+    const generateThumbnail = useCallback(() => {
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        
+        if (!video || !canvas) return;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        // Set canvas dimensions to match video
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        // Draw video frame to canvas
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        // Convert canvas to blob URL
+        canvas.toBlob((blob) => {
+            if (blob) {
+                const url = URL.createObjectURL(blob);
+                setThumbnailUrl(url);
+                setIsLoading(false);
+                onThumbnailGenerated?.(url);
+            }
+        }, 'image/jpeg', 0.8);
+    }, [onThumbnailGenerated]);
+
+    const handleVideoLoad = useCallback(() => {
+        const video = videoRef.current;
+        if (!video) return;
+
+        // Seek to 1 second or 10% of video duration, whichever is smaller
+        const seekTime = Math.min(1, video.duration * 0.1);
+        video.currentTime = seekTime;
+    }, []);
+
+    const handleVideoSeeked = useCallback(() => {
+        generateThumbnail();
+    }, [generateThumbnail]);
+
+    const handleVideoError = useCallback(() => {
+        setIsLoading(false);
+        setHasError(true);
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            // Cleanup blob URL when component unmounts
+            if (thumbnailUrl) {
+                URL.revokeObjectURL(thumbnailUrl);
+            }
+        };
+    }, [thumbnailUrl]);
+
+    if (hasError) {
+        return (
+            <div className="flex h-48 w-full items-center justify-center rounded-lg bg-gray-200">
+                <div className="text-center">
+                    <svg
+                        className="mx-auto h-8 w-8 text-gray-400"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                    >
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                        />
+                    </svg>
+                    <p className="mt-2 text-sm text-gray-500">
+                        Unable to load video
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    if (isLoading) {
+        return (
+            <div className="flex h-48 w-full items-center justify-center rounded-lg bg-gray-100">
+                <div className="text-center">
+                    <svg
+                        className="mx-auto h-8 w-8 animate-spin text-gray-400"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                    >
+                        <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                        />
+                        <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                    </svg>
+                    <p className="mt-2 text-sm text-gray-500">
+                        Generating thumbnail...
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <>
+            {thumbnailUrl && (
+                <Image
+                    src={thumbnailUrl}
+                    alt={title}
+                    className="h-48 w-full rounded-lg object-cover"
+                />
+            )}
+            <video
+                ref={videoRef}
+                className="hidden"
+                src={videoUrl}
+                onLoadedMetadata={handleVideoLoad}
+                onSeeked={handleVideoSeeked}
+                onError={handleVideoError}
+                preload="metadata"
+                muted
+            />
+            <canvas ref={canvasRef} className="hidden" />
+        </>
+    );
+};
+
 interface ScriptCardProps {
     script: Script;
 }
@@ -277,7 +427,7 @@ const ScriptCard = ({ script }: ScriptCardProps) => {
 
     const isApproved = script.status === "APPROVED";
     const isRejected = script.status === "REJECTED";
-    const hasVideo = script.videoUrl && script.thumbnailUrl;
+    const hasVideo = script.videoUrl;
 
     return (
         <>
@@ -308,19 +458,9 @@ const ScriptCard = ({ script }: ScriptCardProps) => {
                     {isApproved && hasVideo && (
                         <div className="mb-4">
                             <div className="relative overflow-hidden rounded-lg bg-gray-100">
-                                <Image
-                                    src={
-                                        script.thumbnailUrl ??
-                                        "/images/placeholder-thumbnail.png"
-                                    }
-                                    alt={script.title}
-                                    className="h-48 w-full rounded-lg object-cover"
-                                    onError={(e) => {
-                                        const img = e.target as HTMLImageElement;
-                                        if (img.src !== window.location.origin + "/images/placeholder-thumbnail.png") {
-                                          img.src = "/images/placeholder-thumbnail.png";
-                                        }
-                                    }}
+                                <VideoThumbnail
+                                    videoUrl={script.videoUrl ?? ""}
+                                    title={script.title}
                                 />
                                 <div className="absolute inset-0 flex items-center justify-center">
                                     <button

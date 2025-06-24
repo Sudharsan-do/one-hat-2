@@ -107,6 +107,7 @@ export const videoRouter = createTRPCRouter({
                         createdAt: true,
                         reason: true,
                         content: true,
+                        videoUrl: true,
                         user: {
                             select: {
                                 email: true,
@@ -160,7 +161,6 @@ export const videoRouter = createTRPCRouter({
                 reason: item.reason,
                 status: item.status,
                 videoUrl: item.videoUrl,
-                thumbnailUrl: item.videoUrl?.concat("/ik-thumbnail.jpg"),
             } as Script;
         });
     }),

@@ -5,5 +5,4 @@ export interface Script {
     reason?: string;
     status: "APPROVED" | "REJECTED" | "PENDING";
     videoUrl?: string;
-    thumbnailUrl?: string;
 }
