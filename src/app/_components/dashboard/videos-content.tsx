@@ -440,7 +440,7 @@ const ScriptCard = ({ script }: ScriptCardProps) => {
                                     {script.title}
                                 </h3>
                                 <StatusBadge
-                                    status={script.status as StatusType}
+                                    status={script.status}
                                 />
                             </div>
                             <p className="text-sm text-gray-500">
@@ -486,7 +486,7 @@ const ScriptCard = ({ script }: ScriptCardProps) => {
                     )}
 
                     <StatusAlert
-                        status={script.status as StatusType}
+                        status={script.status}
                         reason={script.reason}
                     />
 

@@ -171,7 +171,7 @@ export const videoRouter = createTRPCRouter({
         const script = await ctx.db.videoScript.findUnique({
             where: { id: input.scriptId },
         });
-        if (!script || script.userId !== ctx.session.user.id) {
+        if (script?.userId !== ctx.session.user.id) {
             throw new Error("Script not found");
         }
         await ctx.db.videoScript.update({
