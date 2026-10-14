@@ -15,7 +15,8 @@ export const env = createEnv({
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
-    OPENAI_API_KEY: z.string(),
+    GEMINI_API_KEY: z.string(),
+    GEMINI_MODEL: z.string().default("gemini-2.0-flash"),
     IMAGEKIT_PRIVATE_KEY: z.string(),
     HEYGEN_API_KEY: z.string(),
     HEYGEN_URL: z.string(),
@@ -39,7 +40,8 @@ export const env = createEnv({
     AUTH_SECRET: process.env.AUTH_SECRET,
     DATABASE_URL: process.env.DATABASE_URL,
     NODE_ENV: process.env.NODE_ENV,
-    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+    GEMINI_MODEL: process.env.GEMINI_MODEL,
     IMAGEKIT_PRIVATE_KEY: process.env.IMAGEKIT_PRIVATE_KEY,
     NEXT_PUBLIC_IMAGEKIT_KEY: process.env.NEXT_PUBLIC_IMAGEKIT_KEY,
     HEYGEN_API_KEY: process.env.HEYGEN_API_KEY,

@@ -2,7 +2,7 @@ import z from "zod";
 import { createTRPCRouter, doctorProcedure } from "../trpc";
 import type { Message } from "~/app/_components/dashboard/message-area";
 import { PrismaSaver } from "~/lib/chat-model/prisma-checkpoint";
-import { ChatOpenAI } from "node_modules/@langchain/openai/dist";
+import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import {
     ChatPromptTemplate,
     MessagesPlaceholder,
@@ -20,10 +20,11 @@ interface HeyGenResponse {
     }
 }
 
-const model = new ChatOpenAI({
-    model: "gpt-4.1-mini",
+const model = new ChatGoogleGenerativeAI({
+    model: env.GEMINI_MODEL,
+    apiKey: env.GEMINI_API_KEY,
     temperature: 0.5,
-    maxTokens: 1000,
+    maxOutputTokens: 1000,
 });
 const systemPrompt = loadSystemPrompt();
 const prompt = ChatPromptTemplate.fromMessages([

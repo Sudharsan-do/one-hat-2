@@ -14,7 +14,7 @@ export async function POST(req: NextRequest){
         const body: HeyGenWebhookBody = (await req.json()) as HeyGenWebhookBody;
         console.log("api/heygen recieved request: ", body);
         if(body.event_type !== "avatar_video.success") {
-            console.log("api/heygen request failed...");
+            console.error("api/heygen request failed...");
             return NextResponse.json({status: 400});
         }
         await db.videoScript.update({
@@ -26,6 +26,7 @@ export async function POST(req: NextRequest){
                 updatedAt: new Date(),
             }
         });
+        console.log("api/heygen updated video URL: ", body.event_data.url);
         return NextResponse.json({status: 200});
     } catch(error){
         console.error('POST /api/heygen error:', error);
